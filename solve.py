@@ -36,6 +36,12 @@ def color(x, y):
     k = (x + j) // 2
     return i + (k % 3)
 
+def offset(tile, x, y):
+    return tuple(
+        (x + i, y + j)
+        for i, j in tile
+    )
+
 class Board:
     def __init__(self):
         self.cells = set()
@@ -70,34 +76,31 @@ class Board:
             for y in range(T, B + 1)
         )
 
-    def check(self, tile, position):
-        X, Y = position
+    def check(self, tile):
         for x, y in tile:
             if t := color(x, y):
-                assert (X + x, Y + y) not in self.cells
-                assert t == (s := color(X + x, Y + y)), f'{t} != {s} @ {(X + x, Y + y)}'
+                assert (x, y) not in self.cells
+                assert t == (s := color(x, y)), f'{t} != {s} @ {(x, y)}'
 
-    def add(self, tile, position):
-        X, Y = position
+    def add(self, tile):
         for x, y in tile:
-            a = (X + x, Y + y)
+            a = (x, y)
             self.perimeter.discard(a)
             self.cells.add(a)
         for x, y in tile:
-            for n in neighbors(X + x, Y + y):
+            for n in neighbors(x, y):
                 if n not in self.cells:
                     self.perimeter.add(n)
 
-    def remove(self, tile, position):
-        X, Y = position
+    def remove(self, tile):
         for x, y in tile:
-            for n in neighbors(X + x, Y + y):
+            for n in neighbors(x, y):
                 self.perimeter.discard(n)
         for x, y in tile:
-            self.cells.remove((X + x, Y + y))
+            self.cells.remove((x, y))
         for x, y in tile:
-            if any((n in self.cells) for n in neighbors(X + x, Y + y)):
-                self.perimeter.add((X + x, Y + y))
+            if any((n in self.cells) for n in neighbors(x, y)):
+                self.perimeter.add((x, y))
 
     def score(self):
         total = [0, 0]
@@ -160,10 +163,12 @@ M = (
 
 # Preview tile perimeter lengths
 b = Board()
-b.check(T[0], (0, 0))
-b.add(T[0], (0, 0))
-b.check(T[5], (6, -4))
-b.add(T[5], (6, -4))
+
+b.check(T[0])
+b.add(T[0])
+m = offset(T[5], 6, -4)
+b.check(m)
+b.add(m)
 print(b)
 print(b.score())
 # b.remove(t, (0, 0))
