@@ -27,3 +27,8 @@ def offset(tile, p):
         (x + i, y + j)
         for i, j in tile
     )
+
+def delta(a, b):
+    x0, y0 = a
+    x1, y1 = b
+    return (x1 - x0, y1 - y0)
