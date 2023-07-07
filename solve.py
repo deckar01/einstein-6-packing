@@ -1,6 +1,3 @@
-
-
-
 A = (1, 0)
 B = (0, 1)
 C = (2, 0)
@@ -25,122 +22,127 @@ W1 = ( # r / 2
     (0, 0, 1, 0, 1, 0, 0),
 )
 
+def neighbors(x, y):
+    return (
+        (x - 1, y),
+        (x + 1, y),
+        (x, y - 1),
+        (x, y + 1),
+    )
+
+def color(x, y):
+    i = 1 if y % 2 < 1 else 4
+    j = 0 if y % 4 < 2 else 3
+    k = (x + j) // 2
+    return i + (k % 3)
 
 class Board:
-    def __init__(self, width, height):
-        self.height = height
-        self.width = width
-        self.rows = [
-            [0 for _ in range(width)]
-            for _ in range(height)
+    def __init__(self):
+        self.cells = set()
+        self.perimeter = set()
+
+    def marker(self, x, y):
+        C = [
+            '0;0;0',
+            '0;208;108',
+            '98;89;249',
+            '211;210;211',
+            '68;67;68',
+            '68;255;0',
+            '207;9;0',
         ]
+        c = C[color(x, y)]
+        if (x, y) in self.cells:
+            v = '█'
+        elif (x, y) in self.perimeter:
+            v = '+'
+        else:
+            v = ' '
+        return f'\033[38;2;{c}m{v}\033[0m'
     
     def __str__(self):
+        L = min(x for x, y in self.perimeter)
+        R = max(x for x, y in self.perimeter)
+        T = min(y for x, y in self.perimeter)
+        B = max(y for x, y in self.perimeter)
         return '\n'.join(
-            ''.join(str(v or '.') for v in row)
-            for row in self.rows
-        ) 
-
-    def get(self, x, y):
-        if x < 0 or x >= self.width:
-            return 0
-        if y < 0 or y >= self.height:
-            return 0
-        return self.rows[y][x]
+            ''.join(self.marker(x, y) for x in range(L, R + 1))
+            for y in range(T, B + 1)
+        )
 
     def check(self, tile, position):
         X, Y = position
-        for y in range(tile.height):
-            for x in range(tile.width):
-                if t := tile.rows[y][x]:
-                    assert not self.rows[X + x][Y + y]
-                    assert t == (s := self.color(X + x, Y + y)), f'{t} != {s} @ {(X + x, Y + y)}'
+        for x, y in tile:
+            if t := color(x, y):
+                assert (X + x, Y + y) not in self.cells
+                assert t == (s := color(X + x, Y + y)), f'{t} != {s} @ {(X + x, Y + y)}'
 
     def add(self, tile, position):
         X, Y = position
-        for y in range(tile.height):
-            for x in range(tile.width):
-                if t := tile.rows[y][x]:
-                    self.rows[Y + y][X + x] = t
+        for x, y in tile:
+            a = (X + x, Y + y)
+            self.perimeter.discard(a)
+            self.cells.add(a)
+        for x, y in tile:
+            for n in neighbors(X + x, Y + y):
+                if n not in self.cells:
+                    self.perimeter.add(n)
 
-    def color(self, x, y):
-        i = 1 if y % 2 < 1 else 4
-        j = 0 if y % 4 < 2 else 3
-        k = (x + j) // 2
-        return i + (k % 3)
+    def remove(self, tile, position):
+        X, Y = position
+        for x, y in tile:
+            for n in neighbors(X + x, Y + y):
+                self.perimeter.discard(n)
+        for x, y in tile:
+            self.cells.remove((X + x, Y + y))
+        for x, y in tile:
+            if any((n in self.cells) for n in neighbors(X + x, Y + y)):
+                self.perimeter.add((X + x, Y + y))
 
     def score(self):
         total = [0, 0]
-        for y in range(-1, self.height):
-            for x in range(-1, self.width):
-                a = self.get(x, y)
-                b = self.get(x, y + 1)
-                if a and not b:
-                    p = self.color(x, y + 1)
+        for x, y in self.perimeter:
+            a = color(x, y)
+            for nx, ny in neighbors(x, y):
+                if (nx, ny) in self.cells:
+                    p = color(nx, ny)
                     total[0] += W0[a][p]
                     total[1] += W1[a][p]
-                elif not a and b:
-                    p = self.color(x, y)
-                    total[0] += W0[b][p]
-                    total[1] += W1[b][p]
-                c = self.get(x + 1, y)
-                if a and not c:
-                    p = self.color(x + 1, y)
-                    total[0] += W0[a][p]
-                    total[1] += W1[a][p]
-                elif not a and c:
-                    p = self.color(x, y)
-                    total[0] += W0[c][p]
-                    total[1] += W1[c][p]
         return total[1] / 2 + total[0] * (3 ** 0.5) / 4
 
 
-class Tile:
-    def __init__(self, offset, *rows):
-        self.offset = offset
-        self.rows = rows
-        self.height = len(self.rows)
-        self.width = len(self.rows[0])
-
-
 T = (
-    Tile(
-        (0, 0),
-        (0, 0, 0, 0, 3, 3, 1, 1, 0),
-        (4, 4, 5, 5, 6, 6, 4, 4, 0),
-        (0, 0, 0, 0, 0, 2, 2, 3, 3),
+    (
+                                    (4,0), (5,0), (6,0), (7,0),
+        (0,1), (1,1), (2,1), (3,1), (4,1), (5,1), (6,1), (7,1),
+                                           (5,2), (6,2), (7,2), (8,2),
     ),
-    Tile(
-        (0, 0),
-        (1, 1, 0, 0, 0, 0, 0),
-        (4, 4, 5, 5, 6, 6, 0),
-        (0, 3, 3, 1, 1, 2, 2),
-        (0, 6, 6, 0, 0, 0, 0),
+    (
+        (0,0), (1,0),
+        (0,1), (1,1), (2,1), (3,1), (4,1), (5,1),
+               (1,2), (2,2), (3,2), (4,2), (5,2), (6,2),
+               (1,3), (2,3),
     ),
-    Tile(
-        (2, 0),
-        (0, 0, 0, 0, 1, 1, 2, 2),
-        (5, 5, 6, 6, 4, 4, 5, 5),
-        (0, 0, 0, 2, 2, 3, 3, 0),
+    (
+                                    (6,0), (7,0), (8,0), (9,0),
+        (2,1), (3,1), (4,1), (5,1), (6,1), (7,1), (8,1), (9,1),
+                             (5,2), (6,2), (7,2), (8,2),
     ),
-    Tile(
-        (3, 3),
-        (4, 4, 5, 5, 0, 0, 0, 0, 0),
-        (0, 3, 3, 1, 1, 2, 2, 3, 3),
-        (0, 6, 6, 4, 4, 0, 0, 0, 0),
+    (
+        (0,1), (1,1), (2,1), (3,1),
+               (1,2), (2,2), (3,2), (4,2), (5,2), (6,2), (7,2), (8,2),
+               (1,3), (2,3), (3,3), (4,3),
     ),
-    Tile(
-        (2, 0),
-        (0, 0, 0, 0, 1, 1, 0),
-        (5, 5, 6, 6, 4, 4, 0),
-        (0, 1, 1, 2, 2, 3, 3),
-        (0, 0, 0, 0, 0, 6, 6),
+    (
+                                    (6,0), (7,0),
+        (2,1), (3,1), (4,1), (5,1), (6,1), (7,1),
+               (3,2), (4,2), (5,2), (6,2), (7,2), (8,2),
+                                           (7,3), (8,3),
     ),
-    Tile(
-        (2, 3),
-        (0, 4, 4, 5, 5, 0, 0, 0),
-        (2, 2, 3, 3, 1, 1, 2, 2),
-        (5, 5, 6, 6, 0, 0, 0, 0),
+    (
+               (3,3), (4,3), (5,3), (6,3),
+        (2,4), (3,4), (4,4), (5,4), (6,4), (7,4), (8,4), (9,4),
+        (2,5), (3,5), (4,5), (5,5),
     ),
 )
 
@@ -155,15 +157,14 @@ M = (
     (-3, -2),
 )
 
-# # Preview board coloring
-# for y in range(8):
-#     print([P(x, y) for x in range(12)])
 
 # Preview tile perimeter lengths
-b = Board(20, 16)
-b.check(T[0], (0, 4))
-b.add(T[0], (0, 4))
-b.check(T[5], (8, 3))
-b.add(T[5], (8, 3))
+b = Board()
+b.check(T[0], (0, 0))
+b.add(T[0], (0, 0))
+b.check(T[5], (6, -4))
+b.add(T[5], (6, -4))
 print(b)
 print(b.score())
+# b.remove(t, (0, 0))
+# print(b.perimeter)
